@@ -1,0 +1,350 @@
+---
+title: "cbd tables"
+author: "David DeStephano"
+date: "March 26, 2020"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(readxl)
+library(summarytools)
+library(magrittr)
+library(broom)
+library(knitr)
+library(tinytex)
+library(tables)
+library(Hmisc)
+library(Gmisc)
+library(likert)
+setwd("C:\\Users\\daved\\Documents\\Chris CBD study tables")
+
+cbd_oirg<-read_excel("CBD survey_AC_JMP 8.5.19.xlsx") 
+
+cbd<-cbd_oirg%>% janitor::clean_names()
+```
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+df <- cbd%>%
+  select(race_simple_2, ethnicity, marital_status, highest_level_of_education, insurance, employment, what_medications_have_you_used_for_your_pelvic_pain, what_adjuvant_treatments_have_you_used_for_your_pelvic_pain, have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain, otc_meds,
+muscle_relax_or_vag_supp,
+tpi_or_botox,
+opioids,
+adjuvant_surgery,
+adjuvant_pfpt,
+adjuvant_yoga_pilates,
+adjuvant_acupuncture) %>% 
+  map(~chisq.test(.x, cbd$have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain, correct=FALSE)) %>% 
+  tibble(names = names(.), data = .) %>% 
+  mutate(stats = map(data, tidy))
+
+
+df2<-unnest(df, stats) %>% filter(names!="have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain") %>% select(-data)
+kable(df2)
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r warning=FALSE}
+cbd[sapply(cbd, is.character)] <- lapply(cbd[sapply(cbd, is.character)], as.factor)
+
+levels(cbd$have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain)
+
+cbd$have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain <- 
+  factor(cbd$have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain, 
+         levels=c("Yes","No"))
+
+#label(cbd$have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain) <- "Cannabis or THC"
+
+
+cols<-c('otc_meds',
+'muscle_relax_or_vag_supp',
+'tpi_or_botox',
+'opioids',
+'adjuvant_surgery',
+'adjuvant_pfpt',
+'adjuvant_yoga_pilates',
+'adjuvant_acupuncture')
+
+cbd[,cols] <- lapply(cbd[,cols],as.factor)
+
+
+```
+
+
+
+
+
+
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+getTable1Stats <- function(x, digits = 1){
+  getDescriptionStatsBy(x = x, 
+                        by =cbd$have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain,
+                        digits = digits,
+                        #html=FALSE,
+                        continuous_fn = describeMean,
+                        factor_fn = describeFactors,
+                        show_all_values = TRUE,
+                        header_count = TRUE,
+                        useNA = "no",
+                        statistics = list(continuous = getPvalWilcox, 
+                                          factor = getPvalFisher, 
+                                          proportion = getPvalFisher))
+  
+}
+
+t1 <- list()
+t1[["Age (years)"]] <-
+  getTable1Stats(cbd$age)
+
+t1[["Race"]] <-
+  getTable1Stats(cbd$race_simple_2)
+  
+t1[["Ethnicity"]] <-
+  getTable1Stats(cbd$ethnicity)
+
+t1[["Marital Status"]] <-
+  getTable1Stats(cbd$marital_status)
+
+t1[["Highest level of Education"]] <-
+  getTable1Stats(cbd$highest_level_of_education)
+
+t1[["Insurance Payer"]] <-
+  getTable1Stats(cbd$insurance)
+
+t1[["Employment status"]] <-
+  getTable1Stats(cbd$employment)
+
+# t1[["Medications used for CPP"]] <-
+#   getTable1Stats(cbd$what_medications_have_you_used_for_your_pelvic_pain)
+
+
+t1[["Over the counter pain medications"]] <-
+   getTable1Stats(cbd$otc_meds)
+
+t1[["Muscle relaxers or vaginal suppositories"]] <-
+   getTable1Stats(cbd$muscle_relax_or_vag_supp)
+
+t1[["Trigger point or Botox injections"]] <-
+   getTable1Stats(cbd$tpi_or_botox)
+
+t1[["Opioid medications"]] <-
+   getTable1Stats(cbd$opioids)
+
+
+# t1[["Adjuvant treatments used for CPP"]] <-
+#   getTable1Stats(cbd$what_adjuvant_treatments_have_you_used_for_your_pelvic_pain)
+
+t1[["Surgery"]] <-
+   getTable1Stats(cbd$adjuvant_surgery)
+
+t1[["Pelvic floor physical therapy"]] <-
+   getTable1Stats(cbd$adjuvant_pfpt)
+
+t1[["Yoga or Pilates"]] <-
+   getTable1Stats(cbd$adjuvant_yoga_pilates)
+
+t1[["Acupuncture"]] <-
+   getTable1Stats(cbd$adjuvant_acupuncture)
+
+
+
+
+mergeDesc(t1) %>%
+  htmlTable(css.rgroup = "",
+            caption  = "P-values generated from a custom set of values",
+            tfoot = "&dagger; Whatever you want the dagger to be")
+
+
+```
+
+
+The fellow was including NA's in the proportion calculations..
+
+
+
+
+
+##Likert
+```{r}
+cbd_likert <- cbd %>% select(starts_with("to_what_extent"))
+
+cbd_likert <- data.frame(cbd_likert) %>% na.omit()
+
+
+levels <- c("No improvement at all", "Insignificantly improved", "Mildly improved", "Very much improved", "Significantly Improved / Complete Recovery")
+
+
+cbd_likert<-cbd_likert %>% 
+  mutate_at(.vars = vars(dplyr::matches("to_what_extent")),
+                     .funs = funs(factor(., levels = levels, 
+                                             ordered = TRUE)))
+
+
+names(cbd_likert) <- sub("to_what_extent_has_cannabis_", "", names(cbd_likert))
+
+names(cbd_likert) <- sub("_cooking_cleaning_bathing", "", names(cbd_likert))
+
+names(cbd_likert) <- sub("_visiting_with_friends_and_family", "", names(cbd_likert))
+
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+names(cbd_likert) <- sub("_", " ", names(cbd_likert))
+
+names(cbd_likert) <- sub("improved", "Improved", names(cbd_likert))
+
+
+names(cbd_likert)
+
+
+# library(labelled)
+# var_label(cbd_likert) <- c("Ability to Move", "sepal width", "petal length", "petal width", "5",
+#                            "6","7","8","9")
+
+
+
+
+
+
+result=likert(cbd_likert)
+dfSummary(cbd_likert)
+plot(result, type="bar")
+
+
+
+
+
+
+library(expss)
+
+
+# add value lables for preserving empty categories
+#val_lab(cbd_likert) = autonum(1:5)
+res = cbd_likert
+for(each in colnames(cbd_likert)){
+    res = res %>% 
+        tab_cells(list(each)) %>% 
+        tab_cols(vars(each)) %>% 
+        tab_stat_rpct(total_row_position = "none")
+}
+
+
+res = res %>% tab_pivot() 
+# add percentage sign
+recode(res[,-1]) = other ~ function(x) ifelse(is.na(x), NA, paste0(round(x, 0), "%"))
+res
+
+
+library(knitr)
+res %>% kable(caption = "To what extent has cannabis improved the following aspects? (n=25)")
+```
+
+
+
+
+
+
+
+
+#Table 3
+
+```{r}
+df <- cbd%>%filter(what_component_of_medical_cannabis_have_you_used!="Unsure") %>%  
+  select(what_component_of_medical_cannabis_have_you_used, how_often_do_you_use_medical_cannabis, topical, inhaled, ingestion, improved_pain_cramping_spasms,improved_irrit_depr_and_anxiety, improved_sleeplessness_insomnia, improved_libido, improved_appetite_weight_loss, side_effects_nausea_abd_pain_constipation_diarrhea_dry_mouth,side_effects_confusion_lightheadedness_paranoida_memory_issues_sleepiness_hallucinations, side_effects_feeling_high, side_effects_none) %>%
+  na.omit()
+
+  
+
+write.csv(df,"File_Name.csv", row.names = FALSE)
+
+#Did in SAS
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r echo=FALSE}
+# cbd2<-cbd %>%select(race_simple_2, ethnicity, marital_status, highest_level_of_education, insurance, employment, what_medications_have_you_used_for_your_pelvic_pain, what_adjuvant_treatments_have_you_used_for_your_pelvic_pain, have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain)
+```
+
+
+
+```{r echo=FALSE}
+
+
+# table <- function(x) {
+# 
+#     ctable(x, cbd2$have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain,
+#          prop = "c",
+#          useNA = "no",
+#          display.labels= TRUE,
+#          totals = FALSE,
+#          chisq = TRUE,
+#          headings = FALSE) %>% 
+#      print(method = "render")
+# 
+# }
+# tables<-map(cbd2, table)
+# tables
+
+# varlist <- names(cbd2[,-1])
+# crosstables <- list(NULL)
+# for (i in varlist){
+#   crosstables[[i]] <- ctable(cbd2[[i]], cbd2$have_you_used_either_cbd_or_thc_as_treatment_for_your_pelvic_pain, 
+#          prop = "c",
+#          useNA = "no",
+#          display.labels= TRUE,
+#          totals = FALSE,
+#          chisq = TRUE,
+#          headings = TRUE) 
+# 
+#   print(crosstables[[i]])
+#   }
+
+
+
+
+
+```
