@@ -2,10 +2,7 @@
 title: "cbd tables"
 author: "David DeStephano"
 date: "March 26, 2020"
-output:
-  html_document: default
-  pdf_document: default
-  word_document: default
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
